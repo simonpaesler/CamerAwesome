@@ -59,6 +59,7 @@ class AwesomeCameraPreviewState extends State<AwesomeCameraPreview> {
   StreamSubscription? _sensorConfigSubscription;
   StreamSubscription? _aspectRatioSubscription;
   CameraAspectRatios? _aspectRatio;
+  StreamSubscription? _orientationSubscription;
   double? _aspectRatioValue;
   AnalysisPreview? _preview;
 
@@ -78,6 +79,15 @@ class AwesomeCameraPreviewState extends State<AwesomeCameraPreview> {
         });
       }
     });
+
+    _orientationSubscription =
+        CamerawesomePlugin.getNativeOrientation()?.listen((orientation) {
+          if (_currentOrientation != orientation && mounted) {
+            setState(() {
+              _currentOrientation = orientation;
+            });
+          }
+        });
 
     // refactor this
     _sensorConfigSubscription =
@@ -137,6 +147,7 @@ class AwesomeCameraPreviewState extends State<AwesomeCameraPreview> {
 
   @override
   void dispose() {
+    _orientationSubscription?.cancel();
     _sensorConfigSubscription?.cancel();
     _aspectRatioSubscription?.cancel();
     super.dispose();
@@ -163,7 +174,7 @@ class AwesomeCameraPreviewState extends State<AwesomeCameraPreview> {
                 child: AnimatedPreviewFit(
                   alignment: widget.alignment,
                   previewFit: widget.previewFit,
-                  previewSize: _previewSize!,
+                  previewSize: effectivePreviewSize,
                   previewPadding: widget.padding,
                   constraints: constraints,
                   sensor: widget.state.sensorConfig.sensors.first,
@@ -192,13 +203,16 @@ class AwesomeCameraPreviewState extends State<AwesomeCameraPreview> {
                       //FIX performances
                       stream: widget.state.filter$,
                       builder: (context, snapshot) {
+                        final texture = quarterTurns != 0
+                            ? RotatedBox(quarterTurns: quarterTurns, child: _textures.first)
+                            : _textures.first;
                         return snapshot.hasData &&
                                 snapshot.data != AwesomeFilter.None
                             ? ColorFiltered(
                                 colorFilter: snapshot.data!.preview,
-                                child: _textures.first,
+                                child: texture,
                               )
-                            : _textures.first;
+                            : texture;
                       },
                     ),
                   ),
@@ -226,6 +240,21 @@ class AwesomeCameraPreviewState extends State<AwesomeCameraPreview> {
         },
       ),
     );
+  }
+
+  /// Returns the number of clockwise 90° turns needed to rotate the portrait
+  /// camera buffer so it appears upright for the current device orientation.
+  int _quarterTurnsForOrientation(CameraOrientations orientation) {
+    switch (orientation) {
+      case CameraOrientations.portrait_up:
+        return 0;
+      case CameraOrientations.landscape_left:
+        return 1;
+      case CameraOrientations.portrait_down:
+        return 2;
+      case CameraOrientations.landscape_right:
+        return 3;
+    }
   }
 
   List<Widget> _buildPreviewTextures() {
