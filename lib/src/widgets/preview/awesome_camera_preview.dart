@@ -62,6 +62,7 @@ class AwesomeCameraPreviewState extends State<AwesomeCameraPreview> {
   StreamSubscription? _orientationSubscription;
   double? _aspectRatioValue;
   AnalysisPreview? _preview;
+  CameraOrientations _currentOrientation = CameraOrientations.portrait_up;
 
   // TODO: fetch this value from the native side
   final int kMaximumSupportedFloatingPreview = 3;
@@ -163,6 +164,15 @@ class AwesomeCameraPreviewState extends State<AwesomeCameraPreview> {
                 : const CircularProgressIndicator(),
           );
     }
+
+    // Determine rotation needed to compensate for device orientation.
+    // The camera buffer is always portrait; when the UI rotates to landscape
+    // we rotate the texture and swap the preview dimensions for correct layout.
+    final quarterTurns = _quarterTurnsForOrientation(_currentOrientation);
+    final isLandscape = quarterTurns == 1 || quarterTurns == 3;
+    final effectivePreviewSize = isLandscape
+        ? PreviewSize(width: _previewSize!.height, height: _previewSize!.width)
+        : _previewSize!;
 
     return Container(
       color: Colors.black,
